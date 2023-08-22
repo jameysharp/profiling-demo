@@ -1,0 +1,9 @@
+# This file describes a Fastly Compute@Edge package. To learn more visit:
+# https://developer.fastly.com/reference/fastly-toml/
+
+authors = ["Jamey Sharp <jsharp@fastly.com>"]
+description = "Demo with deliberate performance problems"
+language = "rust"
+manifest_version = 3
+name = "profiling-demo"
+service_id = ""
