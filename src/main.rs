@@ -1,40 +1,30 @@
 use fastly::http::StatusCode;
-use fastly::{Error, Request, Response};
-use rsa::pkcs1v15::SigningKey;
-use rsa::pkcs8::{EncodePublicKey, LineEnding};
-use rsa::rand_core::OsRng;
-use rsa::sha2::Sha256;
-use rsa::signature::{RandomizedSigner, SignatureEncoding};
-use rsa::RsaPrivateKey;
+use fastly::{Error, Request, Response, SecretStore};
+use jwt_simple::prelude::*;
 
 #[fastly::main]
 fn main(req: Request) -> Result<Response, Error> {
+    let key = SecretStore::open("keys")?
+        .get("signing-key")
+        .expect("signing-key in keys store")
+        .plaintext();
+    let key = RS256KeyPair::from_pem(std::str::from_utf8(&key)?)?;
+
     let count = req
         .get_query_parameter("n")
         .and_then(|n| n.parse().ok())
         .unwrap_or(5);
-    let data = format!(
-        "{}",
-        if req.get_query_parameter("fast").is_some() {
-            fib_fast(count)
-        } else {
-            fib_slow(count)
-        }
-    );
+    let data = if req.get_query_parameter("fast").is_some() {
+        fib_fast(count)
+    } else {
+        fib_slow(count)
+    };
 
-    let mut rng = OsRng;
-    let private_key = RsaPrivateKey::new(&mut rng, 2048)?;
-    let public_key = private_key.to_public_key();
-    let signing_key = SigningKey::<Sha256>::new(private_key);
-    let signature = signing_key.sign_with_rng(&mut rng, data.as_bytes());
+    let claims = Claims::create(Duration::from_hours(2)).with_subject(data.to_string());
+    let token = key.sign(claims)?;
 
     let mut resp = Response::from_status(StatusCode::OK);
-    resp.set_body_text_plain(&format!(
-        "{}\n{:?}\n{}",
-        data,
-        signature.to_bytes(),
-        public_key.to_public_key_pem(LineEnding::LF)?
-    ));
+    resp.set_body_text_plain(&format!("{}\n{}\n", data, token));
     Ok(resp)
 }
 

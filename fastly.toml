@@ -7,3 +7,9 @@ language = "rust"
 manifest_version = 3
 name = "profiling-demo"
 service_id = ""
+
+[local_server]
+  [local_server.secret_stores]
+    [[local_server.secret_stores.keys]]
+      key = "signing-key"
+      file = "private.pem"
